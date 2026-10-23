@@ -57,5 +57,7 @@ proxied path is therefore blocked and the only working route to the Jenkins UI
 - **Companion changes:** `nita-webapp/gate-jenkins-behind-webapp-session`
   (session gate at the proxy) and
   `nita-jenkins/revoke-anonymous-build-and-enable-csrf` (Jenkins-side
-  hardening). This change is what makes the gate meaningful; it is safe to
-  apply before or after the others.
+  hardening). Deploy the hardening first, this networking change second, and
+  the webapp session gate last. This removes anonymous build/cancel access
+  before closing the direct route, and ensures proxy connectivity is ready
+  before the gate is enabled.

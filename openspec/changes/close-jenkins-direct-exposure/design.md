@@ -97,9 +97,14 @@ advertises `:8443` the bypass is gone but the confusion remains.
 
 ## Migration Plan
 
-1. Apply the updated manifests with `apply-k8s.sh` (Deployment rollout restarts
-   the Jenkins pod; `jenkins_home` is a PVC so no data is lost).
-2. Verify `https://<host>:8443/` is refused and `https://<host>/jenkins/` loads.
-3. Run `nita-cmd jenkins version` and confirm it still answers.
+1. Deploy `nita-jenkins/revoke-anonymous-build-and-enable-csrf` first and
+  verify authenticated build clients still work.
+2. Apply the updated manifests with `apply-k8s.sh` (Deployment rollout restarts
+  the Jenkins pod; `jenkins_home` is a PVC so no data is lost).
+3. Verify `https://<host>:8443/` is refused, the proxy pod can reach Jenkins
+  on 8080, and `https://<host>/jenkins/` loads through the proxy.
+4. Run `nita-cmd jenkins version` and confirm it still answers.
+5. Deploy `nita-webapp/gate-jenkins-behind-webapp-session` after proxy
+  connectivity is confirmed.
 
 Rollback: re-add `hostPort: 8443` and re-apply.
