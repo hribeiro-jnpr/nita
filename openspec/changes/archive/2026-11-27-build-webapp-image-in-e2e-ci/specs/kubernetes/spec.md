@@ -33,3 +33,13 @@ NITA Kind integration CI SHALL build the webapp image from the latest commit on 
 #### Scenario: Invalid webapp source selection
 - **WHEN** the selected webapp repository is not `owner/repo` or the ref is not a safe git ref name
 - **THEN** the workflow fails before deploying the stack and reports the required format
+
+### Requirement: Kind CI loads images for the selected platform
+The Kind workflow SHALL load each test image into its node and SHALL fall back
+to a single-platform archive when Docker-daemon loading fails.
+
+#### Scenario: Multi-platform Docker image store
+- **GIVEN** Docker cannot provide the image layers required by the Kind node
+- **WHEN** the workflow loads an image for the selected architecture
+- **THEN** it exports only that platform, loads the archive into Kind and
+  removes the temporary archive

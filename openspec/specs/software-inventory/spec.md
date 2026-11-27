@@ -1,4 +1,12 @@
-## ADDED Requirements
+# software-inventory Specification
+
+## Purpose
+
+Provide reviewed, reproducible repository dependency inventory and release
+evidence without implying that it inventories installed systems or container
+contents.
+
+## Requirements
 
 ### Requirement: Reviewed direct dependency inventory
 The repository SHALL maintain one catalog of direct product components, host prerequisites, and optional tools, with source references, installation conditions, version status, and license sources. CI SHALL fail on missing, stale, or multiply owned discovered references, duplicate component IDs, and invalid dependency references.

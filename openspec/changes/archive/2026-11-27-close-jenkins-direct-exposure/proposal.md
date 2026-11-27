@@ -24,9 +24,9 @@ proxied path is therefore blocked and the only working route to the Jenkins UI
   Service still exposes it; it is simply not published on the node.
 - **NetworkPolicy allows the proxy and restricts 8443.** Ingress on 8080 is
   permitted from `webapp`, `proxy`, and `jenkins` pods. Ingress on 8443 is
-  permitted from `jenkins` pods only — that port is used by the
-  `nita-cmd jenkins …` scripts, which run `jenkins-cli.jar` inside the Jenkins
-  pod via `kubectl exec` and connect to `https://jenkins:8443/jenkins/`.
+  permitted from `jenkins` pods only. Shipped `nita-cmd jenkins …` operations
+  run the REST helper inside the Jenkins container and use its local
+  `http://localhost:8080/jenkins` endpoint.
 - **Operator-facing text points at the proxy.** `install.sh`'s closing message
   and `docs/nita-examples.md` give `https://<host>/jenkins/` as the Jenkins
   URL. Stale `docker ps` output in `docs/containers.md` showing
@@ -57,7 +57,7 @@ proxied path is therefore blocked and the only working route to the Jenkins UI
 - **Companion changes:** `nita-webapp/gate-jenkins-behind-webapp-session`
   (session gate at the proxy) and
   `nita-jenkins/revoke-anonymous-build-and-enable-csrf` (Jenkins-side
-  hardening). Deploy the hardening first, this networking change second, and
-  the webapp session gate last. This removes anonymous build/cancel access
-  before closing the direct route, and ensures proxy connectivity is ready
-  before the gate is enabled.
+  hardening). Deploy this networking change first, then the Jenkins hardening
+  and the webapp session gate together. Jenkins trusts forwarded identity
+  headers only after the direct route is closed and the proxy can reach it;
+  the hardening and the gate depend on each other and cannot ship separately.

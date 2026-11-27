@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Kubernetes Certificate Renewal Command
 The system SHALL provide `nita-cmd kube renew-certs` as a dedicated

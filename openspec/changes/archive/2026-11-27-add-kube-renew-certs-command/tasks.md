@@ -34,4 +34,9 @@
       printed to stderr before execution
 - [x] 4.5 Confirm success output reminds operators to restart control-plane
       static Pods and repeat on each control-plane node in HA clusters
-- [ ] 4.6 Verify the documented procedure in a disposable kubeadm cluster
+- [x] 4.6 Verify the documented procedure in a disposable kubeadm cluster
+      (kind v0.33.0 node, Kubernetes v1.37.0: `nita-cmd kube renew-certs`
+      exited 0 and renewed all 11 certificates; restarting each static Pod gave
+      new containers and `/readyz` ok. kube-apiserver took 29s to stop, so
+      `docs/certificates.md` now says to wait until the Pod has stopped rather
+      than a fixed 20s.)

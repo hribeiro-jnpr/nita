@@ -23,9 +23,12 @@ the control-plane static Pods.
 After renewal, restart the control-plane Pods so they load the new certificates.
 Kubernetes static Pods are managed by kubelet, so deleting them with kubectl
 does not restart them. On each control-plane node, temporarily move one
-manifest at a time out of `/etc/kubernetes/manifests/`, wait at least 20
-seconds for kubelet to stop that Pod, then move the manifest back and wait for
-the Pod to be recreated before proceeding to the next manifest. Perform this
+manifest at a time out of `/etc/kubernetes/manifests/`, wait until kubelet has
+stopped that Pod (`sudo crictl ps --name kube-apiserver` prints no container;
+kube-apiserver can take about 30 seconds to shut down), then move the manifest
+back and wait for the Pod to be recreated before proceeding to the next
+manifest. Moving a manifest back before its Pod has stopped can leave the old
+Pod running with the old certificates. Perform this
 maintenance in a controlled window, especially on a single-control-plane
 cluster. See the [kubeadm certificate renewal procedure](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-certs/#manual-certificate-renewal)
 for details.

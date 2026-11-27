@@ -36,6 +36,10 @@ and the Kubernetes spec delta.
   it to `$GITHUB_STEP_SUMMARY`.
 - Always build the checked-out source and load that local tag into Kind. No
   registry fallback: if checkout or build fails, the job fails.
+- First use `kind load docker-image`; if the Docker 29 containerd image store
+  cannot resolve a multi-platform image's non-host layers, export only the
+  selected matrix platform with `docker save --platform` and load that archive.
+  Remove the temporary archive after a successful load.
 
 ## Risks / Trade-offs
 

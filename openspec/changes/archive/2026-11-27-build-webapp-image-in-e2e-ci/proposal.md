@@ -19,6 +19,8 @@ record the exact commit that was tested.
   companion repository or branch/tag/commit, and fail clearly for malformed
   values.
 - Remove the registry-pull fallback for the webapp image in the E2E job.
+- Fall back from Docker-daemon image loading to a single-platform image archive
+  for all test images, avoiding multi-platform content-store failures.
 - Document the default and overrides, and distinguish this source-build
   integration check from published-image release validation.
 

@@ -197,8 +197,23 @@ jobs:
 
       # Pre-pull images on the Docker daemon then load them directly into the
       # Kind node. This avoids pull timeouts during the rollout wait steps.
+      # With Docker's containerd image store (default since Docker 29),
+      # `docker save` exports every platform of a pulled multi-arch image while
+      # only the host platform's layers exist, so `kind load docker-image` fails
+      # with "content digest ... not found" (kubernetes-sigs/kind#3795). Fall
+      # back to loading a single-platform archive in that case.
       - name: Pull and load container images into Kind
+        env:
+          IMAGE_PLATFORM: linux/${{ matrix.architecture }}
         run: |
+          load_image() {
+            kind load docker-image "$1" --name "${CLUSTER_NAME}" && return
+            echo "==> Retrying ${1} as a ${IMAGE_PLATFORM} image archive"
+            archive="$(mktemp)"
+            docker save --platform "${IMAGE_PLATFORM}" -o "${archive}" "$1"
+            kind load image-archive "${archive}" --name "${CLUSTER_NAME}"
+            rm -f "${archive}"
+          }
           images=(
             "mariadb:10.11"
             "nginx:stable"
@@ -210,9 +225,9 @@ jobs:
           for img in "${images[@]}"; do
             echo "==> Pulling ${img}"
             docker pull "${img}"
-            kind load docker-image "${img}" --name "${CLUSTER_NAME}"
+            load_image "${img}"
           done
-          kind load docker-image "${NITA_WEBAPP_IMAGE}" --name "${CLUSTER_NAME}"
+          load_image "${NITA_WEBAPP_IMAGE}"
 
       # Apply resources with no ConfigMap dependencies first:
       # namespace → storage (SC, PVs, PVCs) → RBAC
@@ -428,6 +443,7 @@ jobs:
       - name: Test Kubernetes ingress and MCP migration
         env:
           NITA_K8S_PROXY_TEST: "1"
+          NITA_K8S_REQUIRE_NETWORK_POLICY: "1"
           NITA_K8S_TEST_IMAGE: ${{ env.NITA_WEBAPP_IMAGE }}
         run: pytest -c /dev/null tests/test_traefik_kubernetes.py tests/test_mcp_kubernetes.py -v
 

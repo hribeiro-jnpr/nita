@@ -13,10 +13,10 @@ Current manifests, as applied by `k8s/apply-k8s.sh`:
   `install.sh` builds from `nita-webapp/nginx/nginx.conf`. That config proxies
   `/jenkins/` to `http://jenkins:8080/jenkins/`.
 
-Consumers of port 8443: the `nita-cmd jenkins …` scripts in `nita-jenkins`
-(`kubectl exec` into the Jenkins pod, then `jenkins-cli.jar -s
-https://admin:admin@jenkins:8443/jenkins/ …`), and humans following the
-`install.sh` message. The webapp never uses 8443; it uses `jenkins:8080`.
+No shipped NITA client uses port 8443. The `nita-cmd jenkins …` scripts in
+`nita-jenkins` run the REST helper inside the Jenkins container and use
+`http://localhost:8080/jenkins`; the webapp uses `jenkins:8080`. Humans must
+use the proxy URL from the `install.sh` message.
 
 ## Goals / Non-Goals
 
@@ -24,14 +24,12 @@ https://admin:admin@jenkins:8443/jenkins/ …`), and humans following the
 
 - The only route from outside the cluster to Jenkins is the nginx proxy.
 - The proxy pod is permitted to reach Jenkins on 8080.
-- `nita-cmd jenkins …` keeps working unchanged.
+- `nita-cmd jenkins …` continues to work through the in-container REST helper.
 - Operator documentation gives the proxied URL.
 
 **Non-Goals**
 
-- Removing Jenkins's HTTPS listener or keystore (would require changing the
-  `nita-cmd` scripts in another repo; they can move to `http://jenkins:8080`
-  later).
+- Removing Jenkins's HTTPS listener or keystore.
 - Changing the Service manifest.
 - Anything about Jenkins authorisation (companion `nita-jenkins` change).
 

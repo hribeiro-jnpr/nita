@@ -4,7 +4,9 @@
 NITA runs as a set of Kubernetes pods in a dedicated `nita` namespace. This
 spec covers namespace, RBAC, storage, deployments, and services as defined by
 the manifests in `k8s/`.
+
 ## Requirements
+
 ### Requirement: Namespace Isolation
 The system SHALL deploy all NITA components into a dedicated `nita` namespace.
 
@@ -61,13 +63,26 @@ only routes traffic once each pod is fully initialised.
 - THEN the pod is marked Ready and starts receiving traffic
 
 ### Requirement: Services and Port Exposure
-The system SHALL expose the webapp on port 8000, Jenkins on port 8443, and the
-proxy on ports 443 (HTTPS) and 8000 within the cluster.
+The system SHALL expose the webapp on port 8000, Jenkins on ports 8080 and 8443, and the
+proxy on ports 443 (HTTPS) and 8000 within the cluster. Only the proxy SHALL be
+published on the node (host port 443). The Jenkins container SHALL NOT bind a
+host port; external access to Jenkins SHALL be available exclusively through the
+proxy at `https://<host>/jenkins/`.
 
 #### Scenario: Webapp service reachable
 - GIVEN the webapp deployment and service are applied
 - WHEN an in-cluster request is made to the webapp service on port 8000
 - THEN a valid HTTP response is returned
+
+#### Scenario: Jenkins is not published on the node
+- GIVEN the Jenkins deployment is applied
+- WHEN a client outside the cluster connects to `https://<node-ip>:8443/`
+- THEN the connection is refused
+
+#### Scenario: Jenkins is reachable through the proxy
+- GIVEN the proxy and Jenkins deployments are applied
+- WHEN a client outside the cluster requests `https://<node-ip>/jenkins/`
+- THEN the request is served by Jenkins via the proxy
 
 ### Requirement: Optional Junos MCP Pod
 The system SHALL support optional deployment of a `junos-mcp-server` pod in the
@@ -87,24 +102,38 @@ mapping.
 
 ### Requirement: Jenkins Port Isolation via NetworkPolicy
 The system SHALL deploy a `NetworkPolicy` in the `nita` namespace that restricts
-ingress to the Jenkins pod on port 8080 to only pods labelled
-`io.kompose.service: webapp` in the same namespace. Ingress on port 8443 SHALL
-remain unrestricted.
+ingress to the Jenkins pod on port 8080 to pods labelled
+`io.kompose.service: webapp`, `io.kompose.service: proxy`, or
+`io.kompose.service: jenkins` in the same namespace, and restricts ingress on
+port 8443 to pods labelled `io.kompose.service: jenkins` only.
 
 #### Scenario: Webapp pod can reach Jenkins on port 8080
-- GIVEN the ClusterRole and ClusterRoleBinding are applied
+- GIVEN the NetworkPolicy is applied
 - WHEN a request originates from the pod labelled `io.kompose.service: webapp`
   in the `nita` namespace and targets the Jenkins pod on port 8080
 - THEN the connection is permitted
 
+#### Scenario: Proxy pod can reach Jenkins on port 8080
+- GIVEN the NetworkPolicy is applied
+- WHEN a request originates from the pod labelled `io.kompose.service: proxy`
+  in the `nita` namespace and targets the Jenkins pod on port 8080
+- THEN the connection is permitted
+
 #### Scenario: Non-webapp pod cannot reach Jenkins on port 8080
-- WHEN a request originates from any pod NOT labelled `io.kompose.service: webapp`
+- WHEN a request originates from any pod NOT labelled `webapp`, `proxy`, or `jenkins`
   and targets the Jenkins pod on port 8080
 - THEN the connection is dropped by the NetworkPolicy
 
-#### Scenario: Any pod can reach Jenkins on port 8443
-- WHEN any pod in any namespace makes a request to the Jenkins pod on port 8443
+#### Scenario: Jenkins pod can reach its own port 8443
+- GIVEN the NetworkPolicy is applied
+- WHEN a request originates from a pod labelled `io.kompose.service: jenkins`
+  and targets the Jenkins pod on port 8443
 - THEN the connection is permitted
+
+#### Scenario: Any pod can reach Jenkins on port 8443
+- WHEN a request originates from any pod NOT labelled `io.kompose.service: jenkins`
+  and targets the Jenkins pod on port 8443
+- THEN the connection is dropped by the NetworkPolicy (the former unrestricted 8443 ingress is withdrawn)
 
 #### Scenario: NetworkPolicy exists after apply
 - GIVEN `apply-k8s.sh` has completed successfully
@@ -157,7 +186,7 @@ Upstream NITA CI SHALL deploy the same rendered manifests on x86 and, only when 
 
 #### Scenario: x86 fork CI uses public packages
 - **WHEN** NITA CI runs in a personal fork
-- **THEN** the x86 Kind deployment pulls canonical public Juniper images rather than deriving package names from the fork owner
+- **THEN** the x86 Kind deployment pulls canonical public Juniper images for the non-webapp components rather than deriving package names from the fork owner, and uses a source-built webapp image
 
 #### Scenario: Upstream ARM stack validation
 - **WHEN** CI runs in the Juniper NITA repository with multi-platform canonical packages available and `NITA_ARM_CI_ENABLED=true`
@@ -166,3 +195,39 @@ Upstream NITA CI SHALL deploy the same rendered manifests on x86 and, only when 
 #### Scenario: Canonical packages are not yet ARM-ready
 - **WHEN** `NITA_ARM_CI_ENABLED` is absent or is not `true`
 - **THEN** CI schedules only the x86 Kind job, even in the Juniper NITA repository
+
+### Requirement: Kind CI test dependencies
+NITA Kind integration CI SHALL install every third-party Python package imported by the test modules it runs with pytest before running them.
+
+#### Scenario: Inventory tests run in the Kind job
+- **WHEN** the Kind job runs `tests/test_software_inventory.py`
+- **THEN** the pinned inventory dependencies, including `jsonschema`, are installed and the module is collected without import errors
+
+#### Scenario: A Kind pytest module adds an undeclared import
+- **WHEN** a test module run by the Kind job imports a third-party package that none of the job's installed requirement files provide
+- **THEN** the installer regression suite fails and names the module and import
+
+### Requirement: Kind CI builds the webapp from latest main
+NITA Kind integration CI SHALL build the webapp image from the latest commit on the companion repository's `main` branch by default, SHALL record the resolved webapp commit SHA, and SHALL NOT pull the webapp image from a registry.
+
+#### Scenario: Default CI builds latest webapp main
+- **WHEN** NITA CI runs without webapp source overrides
+- **THEN** it checks out the current tip of `main` in `<repository owner>/nita-webapp`, builds and loads that local webapp image into Kind, and reports the resolved webapp commit SHA in the job summary
+
+#### Scenario: Override webapp source
+- **WHEN** repository variables or a manual NITA CI run supply a valid webapp repository and/or ref (branch, tag or commit SHA)
+- **THEN** the workflow builds and tests that source locally, using defaults for any value not supplied
+
+#### Scenario: Invalid webapp source selection
+- **WHEN** the selected webapp repository is not `owner/repo` or the ref is not a safe git ref name
+- **THEN** the workflow fails before deploying the stack and reports the required format
+
+### Requirement: Kind CI loads images for the selected platform
+The Kind workflow SHALL load each test image into its node and SHALL fall back
+to a single-platform archive when Docker-daemon loading fails.
+
+#### Scenario: Multi-platform Docker image store
+- **GIVEN** Docker cannot provide the image layers required by the Kind node
+- **WHEN** the workflow loads an image for the selected architecture
+- **THEN** it exports only that platform, loads the archive into Kind and
+  removes the temporary archive

@@ -314,6 +314,51 @@ class InstallerRegressionTests(unittest.TestCase):
         )
         self.assertNotIn("if", build)
 
+    def test_kind_ci_falls_back_to_single_platform_archive(self):
+        workflow = yaml.safe_load(NITA_CI.read_text(encoding="utf-8"))
+        step = next(
+            step for step in workflow["jobs"]["e2e-kind"]["steps"]
+            if step.get("name") == "Pull and load container images into Kind"
+        )
+        self.assertEqual(
+            step["env"]["IMAGE_PLATFORM"], "linux/${{ matrix.architecture }}"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            fakes = {
+                "docker": 'printf "docker %s\\n" "$*"',
+                # Mimic kind on Docker 29's containerd image store.
+                "kind": 'printf "kind %s\\n" "$*"\n'
+                        '[ "$1 $2" != "load docker-image" ]',
+            }
+            for name, body in fakes.items():
+                executable = Path(directory) / name
+                executable.write_text(f"#!/bin/sh\n{body}\n")
+                executable.chmod(0o755)
+            image = "nita-webapp-verification:local"
+            env = os.environ | {
+                "PATH": directory + os.pathsep + os.environ["PATH"],
+                "NITA_WEBAPP_IMAGE": image,
+                "NITA_JENKINS_IMAGE": "jenkins:test",
+                "NITA_ANSIBLE_IMAGE": "ansible:test",
+                "NITA_ROBOT_IMAGE": "robot:test",
+                "CLUSTER_NAME": "test-cluster",
+                "IMAGE_PLATFORM": "linux/arm64",
+            }
+            result = subprocess.run(
+                ["bash", "-e", "-c", step["run"]],
+                env=env, text=True, capture_output=True, check=True,
+            )
+        for loaded in ("mariadb:10.11", "jenkins:test", image):
+            self.assertRegex(
+                result.stdout,
+                rf"docker save --platform linux/arm64 -o \S+ {re.escape(loaded)}\n",
+            )
+        self.assertEqual(
+            result.stdout.count("kind load image-archive "),
+            result.stdout.count("kind load docker-image "),
+        )
+        self.assertIn("--name test-cluster", result.stdout.splitlines()[-1])
+
     def test_kind_ci_validates_webapp_source_selection(self):
         workflow = yaml.safe_load(NITA_CI.read_text(encoding="utf-8"))
         steps = workflow["jobs"]["e2e-kind"]["steps"]

@@ -5,6 +5,7 @@
 - [x] 1.1 Default the Kind workflow webapp source to `<owner>/nita-webapp` at branch `main`, with independent repository-variable and manual-input overrides; validate the repository and ref format, check out and build that source, record the resolved commit SHA in the log and step summary, load the local image into Kind, and verify no registry-pull fallback or fixed default commit remains.
 - [x] 1.2 Update README to describe the latest-`main` default, the resolved-SHA summary, the repository variables and manual overrides, and separate published-image release validation; verify all documented names match the workflow.
 - [x] 1.3 Update installer regression tests for the `main` default, ref validation, and SHA recording.
+- [x] 1.4 Fall back to a single-platform Docker archive when `kind load docker-image` fails; add a regression test that exercises the fallback.
 
 ## 2. Validation
 

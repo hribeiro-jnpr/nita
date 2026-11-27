@@ -48,7 +48,8 @@ port 8443 to pods labelled `io.kompose.service: jenkins` only.
 
 #### Scenario: Jenkins pod can reach its own port 8443
 - GIVEN the NetworkPolicy is applied
-- WHEN `jenkins-cli.jar` is executed inside the Jenkins pod against `https://jenkins:8443/jenkins/`
+- WHEN a request originates from a pod labelled `io.kompose.service: jenkins`
+  and targets the Jenkins pod on port 8443
 - THEN the connection is permitted
 
 #### Scenario: Any pod can reach Jenkins on port 8443
